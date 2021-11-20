@@ -1,0 +1,58 @@
+Let's create our first "Hello World!" Linux kernel module.
+
+Before we start, lets see what a Linux kernel module is,
+
+A Linux kernel module is just a piece of software, which runs in the kernel
+space and since this runs in kernel space, this brings some advantages and some
+disadvantages. For example, in the kernel space we can access the hardware
+directly, but we have some limitations. We can't use float variables, and stack
+is little bit smaller. But kernel module is the write place to write our device
+drivers.
+
+The good thing about Linux kernel modules is that, we can load them
+dynamically into the kernel and out of the kernel.
+
+Now, lets write our first kernel module.
+Refer the file 'mymodule.c' in this same directory.
+
+Notes:
+-----
+
+(1) Using '__init' is just setting up an attribute for this a function. This
+attribute is used by compiler the collect all the function with this attribute
+and keep them in a special text region, so that kernel can later delete these
+functions from the main memory, so that this memory can be utilized for some
+better purposes, because the initialization has already been done for this,
+and now, there is no use of this function.
+
+Surely, we need a special linker script to keep all such functions with this
+attribute in a particular section of memory.
+
+Below is a good discussion on this,
+https://stackoverflow.com/questions/8832114/what-does-init-mean-in-the-linux-kernel-code
+
+To compile our module, do below:
+[ ] make
+
+Now, if you do 'ls' you will find a file 'mymodule.ko' along with other files.
+This file is the kernel module, and need to be loaded in the kernel.
+[ ] ls
+Makefile  Module.symvers  README  modules.order  mymodule.c  mymodule.ko  mymodule.mod  mymodule.mod.c  mymodule.mod.o  mymodule.o
+
+Load the module in kernel with below command:
+[ ] sudo insmod mymodule.ko
+
+With below command(lsmod), you can see that module is successfully loaded.
+[ ] lsmod | grep mymodule
+mymodule               16384  0
+
+With below command, we can see the kernel log printed when kernel was loaded.
+[ ] dmesg | tail
+[ 2717.878497] Hello, kernel
+
+Now, let's remove the module from kernel.
+[ ] sudo rmmod mymodule
+
+Let's see the kernel logs.
+[ ] dmesg | tail
+[ 2897.985833] Goodbye, kernel
