@@ -1,0 +1,131 @@
+There is no concept of thread in Linux, every running program is a process and
+has its own 'task_struct'.
+
+It may happen that two or more processes(task_struct) share the address space
+(like, data segment, code segment and heap..etc).
+
+For any process creation, kernel does below things,
+
+    1. Make a space of size(THREAD_SIZE) in the main memory.
+    2. For x86 platform, it is double of PAGE_SIZE(as below).
+            #define THREAD_SIZE_ORDER	1
+            #define THREAD_SIZE		(PAGE_SIZE << THREAD_SIZE_ORDER)
+    2. This is also called the task's kernel stack.
+    3. Now, In one end of this task's kernel stack, structure 'task_struct' will
+       reside and 'stack' pointer of 'task_struct' will point to the other side
+       of this kernel's stack memory for this task.
+    4. Meaning, the size of kernel's stack for a task is limited to this size,
+       'THREAD_SIZE - sizeof(task_struct)'. Hence, be careful when you try to
+       write interrupt handlers for a task. Don't take big size arrays in signal
+       handlers. The kernel stack for a task is limited. It is not expanded
+       same as user-space stack of a task.
+
+Below is the structure of 'task_struct'. Here, you can see that it has a
+'__state' member, which reflect, what is the state of this task. When a task is
+running its code this value will be 'TASK_RUNNING'. For example, if a task just
+started, it will be in runnable queue of the kernel. Scheduler will pick it at
+some point of time and start execution. If scheduler switch to another task,
+then also this task will be in runnable queue, because it is ready to execute.
+
+struct task_struct {
+#ifdef CONFIG_THREAD_INFO_IN_TASK
+	/*
+	 * For reasons of header soup (see current_thread_info()), this
+	 * must be the first element of task_struct.
+	 */
+	struct thread_info		thread_info;
+#endif
+	unsigned int			__state;
+.........
+.........
+}
+
+Suppose, our task start to wait for some input/output. Let's say we do a
+'getchar', which gets stuck on an input from user. In this case, this task will
+get the value 'TASK_INTERRUPTIBLE' in '__state' member and task will be moved
+from 'runnable queue' to 'wait queue'. Once the user provides an input, this
+task will be moved from 'wait queue' to 'runnable queue' again and scheduler can
+anytime take this task and start to execute.
+
+Example of this is signal1.c in this same folder.
+
+Here, once 'getchar' is called, this task is put in the 'IO wait queue', and
+'__state' is set to 'TASK_INTERRUPTIBLE'. Meaning, suppose when it was waiting
+for an input from user, if you press ctrl-c, this task will be moved to the
+'runnable queue' by setting 'TASK_RUNNING' to the '__state' of the task, then
+scheduler will schedule this task at time time, execution of the signal handler
+for the same signal will happen, and again the task will come back to the
+'IO wait queue' by setting up 'TASK_INTERRUPTIBLE' in '__state' and again
+continue to wait for the input from user as before.
+This is an example of 'TASK_INTERRUPTIBLE'.
+
+-------------------------------------------
+[ ] gcc signal1.c
+[ ] ./a.out
+^CI am main task's sig_handler. Wont die..
+^CI am main task's sig_handler. Wont die..
+                                           <-- Enter pressed here.
+Main task is over.
+-------------------------------------------
+
+Also, suppose, our task calls 'sleep(60)' (sleeping for 60 seconds). This is
+actually asking the timer to send us a signal after 60 seconds. So here,
+'__state' gets the value 'TASK_UNINTERRUPTIBLE' and goes to the 'wait queue'.
+After 60 seconds when the task gets a signal from timer, the ISR for this task
+gets executed, and then execution for this task goes on.
+
+Suppose, before this 60 seconds is completed, you send an interrupt(ctrl-c) to
+the task, the task will be moved to the 'running queue' by setting up
+'TASK_RUNNING' and scheduler will pick this task and execute the signal handler
+but now, this task will not go to the 'TASK_UNINTERRUPTIBLE' state again as we
+saw in last example (signal1.c), where after execution of signal handler task
+went back to the same 'TASK_INTERRUPTIBLE' state and started to wait for the IO.
+
+Example of 'TASK_UNINTERRUPTIBLE' is signal2.c
+
+-------------------------------------------
+[ ] gcc signal2.c
+[ ] ./a.out
+^CI am in main task's sig_handler. Wont die..
+Main thread sleep is over.
+-------------------------------------------
+
+The 3rd example is to show what happens if there are 3 tasks, which are sharing
+address space. If these all tasks set up a signal handler for the same type,
+let's say, 'SIGINT'. Then, if the same signal is send by a user, which task
+will handle this.
+
+The answer is that, same as address space, ISR are also shared between address
+space sharing tasks. That means, whatever is the latest 'signal' api is called
+for all these tasks, that will be the one which will be called if an interrupt
+is called.
+
+In this example, there is one main program which created 2 tasks, which runs
+one by one for some time. The very first the main thread ran and did 'signal',
+so the ISR for signal is set with a function, then the thread1 'signal' is
+called. Hence, that sig_handler is effective, and then at last thread2's
+'signal' is done, so the effective signal handler becomes that one.
+
+Means, signal handlers are common between all these address space sharing tasks.
+
+and also, when the signal is sent, the main task is the one which runs the
+signal handler. With this example, we can clearly understand this.
+
+-------------------------------------------
+[ ] gcc signal3.c  -lpthread
+[ ] ./a.out
+Task 1 running.
+^CI am in task2 sig_handler. Wont die..
+Main task's sleep is over. Again going for sleep
+^CI am in task2 sig_handler. Wont die..
+Main task's sleep is over. Again going for sleep
+Task 1 sleep is over.
+Task 2 running.
+^CI am in task2 sig_handler. Wont die..
+Main task's sleep is over. Again going for sleep
+Task 2 sleep is over.
+Task 1 running.
+Task 1 sleep is over.
+Task 2 running.
+Task 2 sleep is over
+-------------------------------------------
