@@ -22,6 +22,11 @@ For any process creation, kernel does below things,
        handlers. The kernel stack for a task is limited. It is not expanded
        same as user-space stack of a task.
 
+Note : When a user program invokes a system call, immediatly mode switch happens
+to kernel space. When mode switches to kernel space, kernel start using the
+task's kernel stack('stack' pointer of 'task_struct') for its program execution,
+otherwise when task is running in user-space, this kernel stack is empty.
+
 Below is the structure of 'task_struct'. Here, you can see that it has a
 '__state' member, which reflect, what is the state of this task. When a task is
 running its code this value will be 'TASK_RUNNING'. For example, if a task just
