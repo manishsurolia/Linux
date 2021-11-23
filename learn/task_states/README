@@ -1,5 +1,7 @@
-There is no concept of thread in Linux, every running program is a process and
-has its own 'task_struct'.
+In Linux, processes/threads are alike to the kernel. The scheduler and various
+other kernel sub-systems do not differentiate processes/threads.
+
+Each process/thread is represented as a 'task_struct' structure in kernel space.
 
 It may happen that two or more processes(task_struct) share the address space
 (like, data segment, code segment and heap..etc).
@@ -39,6 +41,13 @@ struct task_struct {
 .........
 .........
 }
+
+Different types of possible states are as below:
+Runnable(R) - TASK_RUNNING - Task is either in ready state or running.
+Sleep(S) - TASK_INTERRUPTABLE
+Disk Sleep(D) - TASK_UNINTERRUPTABLE
+Zombie(Z) - __EXIT_ZOMBIE
+STOPPED(T) - __TASK_STOPPED (TTY Stop)
 
 Suppose, our task start to wait for some input/output. Let's say we do a
 'getchar', which gets stuck on an input from user. In this case, this task will
@@ -129,3 +138,31 @@ Task 1 sleep is over.
 Task 2 running.
 Task 2 sleep is over
 -------------------------------------------
+
+Zombie state of a task is like task is exited but not yet reaped. The duty of
+the parent task is to call 'wait' system call explicitly to wait for child task
+to finish, to find out what is the exit code of the child,
+
+So, if the parent task did not call 'wait', it child will go in the zombie
+state.
+
+Below is a program related to the exit state of the main function of a program.
+The return value of the main function represents the return value of the whole
+program and only last 8-bits of the return value is actually the return value.
+
+Let's say we have a main function, which returns the value 2000, then what will
+be the actual return value.
+
+2000 ==> 00000000 00000000 00000111 11010000
+
+Last 8-bits represents the value 208, so the actual return value will be 208.
+
+-------------------------------------------
+[ ] gcc ret.c
+[ ] ./a.out
+[ ] echo $?
+208
+-------------------------------------------
+
+Only the last 8-bits represents the EXIT states of the program. Not only in
+Linux, but in all Unix systems it is the same.
