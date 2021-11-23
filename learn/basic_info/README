@@ -1,0 +1,108 @@
+On Linux, processes/threads are same to the kernel. The scheduler and other
+kernel sub-systems do not differentiate processes/threads.
+
+Each process/thread is represented by a structure called 'task_struct' within
+kernel space.
+
+Every task has a unique pid of it.
+
+When kernel boots, kernel creates 2 tasks(struct task_struct).
+    1. Init(pid == 1) - This task is the one, which becomes ancestor for all
+other user-space tasks. This task starts its life as a kernel function and
+eventually it becomes a user level task(/sbin/init) at the last stage of the
+kernel boot-up.
+
+[ ] ps -eaf
+UID          PID    PPID  C STIME TTY          TIME CMD
+root           1       0  0 17:29 ?        00:00:01 /sbin/init splash
+
+This /sbin/init is on the root of the task heirarchy in user space tasks.
+It does not run, but it is always there in memory.
+
+Why it should be there in memory? Why it does not exit after system
+initialization?
+
+There is a rule, that every task should have a parent/child hierarichy.
+Suppose there is task, which created another task and then exited without
+waiting for the child process to exit. So, '/sbin/init' becomes the parent
+for that orphan process.
+
+In Linux, a task memory is not freed until the parent process does not wait
+for it. So, if a parent process exited without calling 'wait' for the child
+task, the child will become orphan now. Then '/sbin/init' becomes parent of
+that.
+
+Note : No hard signals are delivered to this task(pid==1). Means, We can not
+kill it with 'kill -9', kill -15, kill -INT, none of them are delivered to this
+task. Kernel never delivers these hard signals to this task. Also, when kernel
+dies, kernel has no idea, what to do, and it goes down.
+
+    2. Kthread(pid == 2) - This is the one which becomes the boss task for all
+other kernel-space threads(kthreads). In kernel its flat hierarchy of all these
+tasks.
+
+The Linux kernel is heavily multi-threaded. Same as user-level tasks, kernel
+also use the same 'task_struct', the only difference is that, these all kernel
+tasks are at same level. They dont have parent-child relationship with each
+other. For all the kernel threads the parent is 'kthread'(PID == 2). You can
+think of it as we have so many (100's) of threads in a single process. They are
+all co-workers.
+
+You can run this 'ps' command and find who many kernel threads are running.
+You will find that all of them have ppid as 2.
+
+[ ] ps -aeo pid,ppid,args,state
+    PID    PPID COMMAND                     S
+      1       0 /sbin/init splash           S
+      2       0 [kthreadd]                  S
+      3       2 [rcu_gp]                    I
+      4       2 [rcu_par_gp]                I
+      5       2 [kworker/0:0-mm_percpu_wq]  I
+      6       2 [kworker/0:0H-events_highpr I
+      8       2 [kworker/u2:0-events_unboun I
+      9       2 [mm_percpu_wq]              I
+     10       2 [rcu_tasks_rude_]           S
+     11       2 [rcu_tasks_trace]           S
+     12       2 [ksoftirqd/0]               S
+     13       2 [rcu_sched]                 I
+     14       2 [migration/0]               S
+    ......
+    ...... and so on.
+
+We will never find a kernel tasks's ppid as anything other than 2.
+
+Note : There is no additional precedence given to any kernel task. Means all the
+user task or a kernel task run with same priority.
+
+Note : who is 'pid 0' task here? The kernel who created first 2 tasks, assumes
+itself as the parent of all (pid 0). Also called swapper.
+
+Note : Threads are never hierarchical. They are always flat. Suppose we wrote a
+program, which executes sometime in main function, and then creates another
+thread.
+Both (main + 1 task) are like working in the same company. They are co-workers
+in a office. They share the common address space(their office) and each of them
+have employee id(pid).
+
+Note : File operations are always multithreaded, due its nature of work. Many
+tasks try to access it in parallel.
+
+Suppose, one thread forks a new task with 'fork()' call, who will be the parent
+of this new task?
+The main thread will be the parent of that new task. Meaning, threads are flat.
+They dont have hierarchy.
+
+See the example
+
+-------------------------
+gcc example1.c -lpthread
+[ ] ./a.out
+Main task pid : 2333
+Creating child inside a thread.
+child has pid : 2335, ppid : 2333
+-------------------------
+
+These two tasks ('init' and 'kthread') are direct descendants of idle task
+(pid == 0), also known as swapper.
+
+
