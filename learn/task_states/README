@@ -51,8 +51,10 @@ Different types of possible states are as below:
 Runnable(R) - TASK_RUNNING - Task is either in ready state or running.
 Sleep(S) - TASK_INTERRUPTABLE
 Disk Sleep(D) - TASK_UNINTERRUPTABLE
+Dead (X) - __EXIT_DEAD
 Zombie(Z) - __EXIT_ZOMBIE
-STOPPED(T) - __TASK_STOPPED (TTY Stop)
+TTY STOP(T) - __TASK_STOPPED (TTY Stop)
+Traced (t) - __TASK_TRACED
 
 Suppose, our task start to wait for some input/output. Let's say we do a
 'getchar', which gets stuck on an input from user. In this case, this task will
@@ -171,3 +173,147 @@ Last 8-bits represents the value 208, so the actual return value will be 208.
 
 Only the last 8-bits represents the EXIT states of the program. Not only in
 Linux, but in all Unix systems it is the same.
+
+Dead (X) - __EXIT_DEAD :
+----------------------
+
+This state of a task (__EXIT_DEAD) is very short duration state that we
+generally don't get to see this state. This is for a very small time frame.
+
+How does a task/'group of tasks' goes to exit?
+exit library function calls 'exit_group'. 'exit_group' is basically responsible
+to exit all the tasks which are their is a group or basically all the co-worker
+tasks.
+
+Even if we pass exit in any co-worker task, it will exit the whole group of
+tasks. That's why its called exit_group system call. 'exit_group' is the last
+system call it invokes, before exiting.
+
+With the utility 'strace', we can figure out the function calls for a running
+program.
+
+Let's write this small program (example.c), and try to pass the binary to the
+'strace', it will show the calls.
+
+int main(void)
+{
+    return 50;
+}
+
+[ ] gcc example.c
+[ ] strace ./a.out
+execve("./a.out", ["./a.out"], 0x7fffabbe3fd0 /* 28 vars */) = 0
+brk(NULL)                               = 0x56029eed4000
+arch_prctl(0x3001 /* ARCH_??? */, 0x7ffd52f745f0) = -1 EINVAL (Invalid argument)
+access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
+openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+fstat(3, {st_mode=S_IFREG|0644, st_size=74394, ...}) = 0
+mmap(NULL, 74394, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7f61e0296000
+close(3)                                = 0
+openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+read(3, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\360q\2\0\0\0\0\0"..., 832) = 832
+pread64(3, "\6\0\0\0\4\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0"..., 784, 64) = 784
+pread64(3, "\4\0\0\0\20\0\0\0\5\0\0\0GNU\0\2\0\0\300\4\0\0\0\3\0\0\0\0\0\0\0", 32, 848) = 32
+pread64(3, "\4\0\0\0\24\0\0\0\3\0\0\0GNU\0\t\233\222%\274\260\320\31\331\326\10\204\276X>\263"..., 68, 880) = 68
+fstat(3, {st_mode=S_IFREG|0755, st_size=2029224, ...}) = 0
+mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f61e0294000
+pread64(3, "\6\0\0\0\4\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0"..., 784, 64) = 784
+pread64(3, "\4\0\0\0\20\0\0\0\5\0\0\0GNU\0\2\0\0\300\4\0\0\0\3\0\0\0\0\0\0\0", 32, 848) = 32
+pread64(3, "\4\0\0\0\24\0\0\0\3\0\0\0GNU\0\t\233\222%\274\260\320\31\331\326\10\204\276X>\263"..., 68, 880) = 68
+mmap(NULL, 2036952, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7f61e00a2000
+mprotect(0x7f61e00c7000, 1847296, PROT_NONE) = 0
+mmap(0x7f61e00c7000, 1540096, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x25000) = 0x7f61e00c7000
+mmap(0x7f61e023f000, 303104, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x19d000) = 0x7f61e023f000
+mmap(0x7f61e028a000, 24576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1e7000) = 0x7f61e028a000
+mmap(0x7f61e0290000, 13528, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7f61e0290000
+close(3)                                = 0
+arch_prctl(ARCH_SET_FS, 0x7f61e0295540) = 0
+mprotect(0x7f61e028a000, 12288, PROT_READ) = 0
+mprotect(0x56029e363000, 4096, PROT_READ) = 0
+mprotect(0x7f61e02d6000, 4096, PROT_READ) = 0
+munmap(0x7f61e0296000, 74394)           = 0
+exit_group(50)                          = ?
++++ exited with 50 +++
+
+You can see here, that 'exit_group' is called at the end with the same value,
+which was returned from main function.
+
+The first thing what 'exit_group' does is, to mark the task as 'X', so that it
+can not be scheduled on any of the run queue. Each processor has its run queue.
+
+Generally run queue load balancing keep happening, whenever there is more load
+on one queue, it gets off loaded to another run queue, so that this task runs
+on a different processor.
+
+Hence, to avoid any such movement of the task after program exited, we need to
+mark it as 'X'. It should never be scheduled, by any means. Then 'exit_group'
+starts freeing up all the resources hold by the tasks of this group. Like tasks
+have memory-map structures, signal structures, file descriptor structures..etc.
+'exit_group' will free up all the structures. Mean's releasing all the
+resoruces occpied by this task.
+
+
+Zombie(Z) - __EXIT_ZOMBIE:
+-------------------------
+
+After all the resoures are freed up by 'exit_group' this task is marked as
+Zombie(Z).
+
+After marking it as Zombie, 'exit_group' will try to find, who is its parent and
+deliver a signal (SIGCHLD) to the parent that its child task has ended.
+
+If parent has already ended before child sent 'SIGCHILD', init task(PID=1),
+handles this child task.
+
+TTY STOP(T) - __TASK_STOPPED (TTY Stop):
+---------------------------------------
+
+You can set this task state using 'ctrl-z'.
+
+create a small program with a infinite while loop and start this program.
+Then check its state as below(in different window).
+
+
+[ ] ps -aeo state,args | grep a.out
+R ./a.out
+
+Now where the program is running, do ctrl-z, and then again check the status.
+Program is stopped and moved to background.
+[ ] ps -aeo state,args | grep a.out
+T ./a.out
+
+Now where the program is running, do 'fg' (foreground), and then again check the
+status.
+
+[ ] ps -aeo state,args | grep a.out
+R ./a.out
+
+
+Traced (t) - __TASK_TRACED:
+--------------------------
+
+When we attach debugger to a task, it is attached using 'ptrace'/'ptrace_attach'
+APIs, it will attach to target process, and it will hook a breakpoint in the
+text segment.
+
+When a breakpoint instrcution is hit by a target process, immediatly the target
+process is retained as it is, find out who is its parent, and go back to its
+parent.
+
+In Linux, There are 2 parents for a task, one is who actually created it,
+another one is that who is currently controlling it. By default both will be
+same.
+
+In this case of gdb, gdb process becomes 'current parent' for this task,
+which is being debugged. The state for that is 'Traced'(__TASK_TRACED).
+
+Example:
+-------
+
+Just create a small program, like an infinite loop inside main function.
+start this task, attach gdb to it. stop it to 'main' function.
+
+Now, in other window check the state of this task. It will be 't', and the
+parent pid will be gdb.
+
+Try it out.
