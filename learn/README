@@ -1,0 +1,15 @@
+This section is basically divided in 2 parts.
+    1. Examples for Linux kernel modules.
+    2. Information about Linux kernel.
+
+Hence, we can divide all the sub-sections as below:
+
+    1. Examples for Linux kernel modules.
+        1. module_hello_world
+        2. module_params
+
+    2. Information about Linux kernel.
+        1. basic_info
+        2. task_states
+        3. user_thread_stack
+        4. task_memory_maps
