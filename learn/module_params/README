@@ -1,3 +1,6 @@
+Note : I always login as 'root' (sudo -i) while using these kernel modules,
+otherwise we may have problems with reading/writing files.
+
 This program is just to show, how we can pass parameters to a Linux kernel
 module.
 
@@ -12,18 +15,53 @@ module_param(num, int, 0660);
 static char *str = "string arg";
 module_param(str, charp, 0660);
 
-Then, we can pass the values to these parameters while inserting this linux
-kernel module as below example, and use these global vars inside any function of
-the module.
+Note : In the above syntax, we are passing the name of global var, type of the
+same and most importantly permissions.
+
+Why do we need to pass permissions here.
+
+When a module is loaded in linux kernel, it checks whether any such
+'module_params' are present or not. If present, it creates a file for that under
+'/sys/modules/<module-name>/<parameters>/' file system.
+
+For example, Here we created 2 params, namely, 'num' and 'str'. Hence, 2 files
+will be created as below:
+
+ '/sys/module/mymodule/parameters/num'
+ '/sys/module/mymodule/parameters/str'
+
+Then the user can any time read/write this file based on the permissions, which
+were fixed in the code.
+
+We can pass the values to these parameters while inserting this linux kernel
+module as below example, and use these global vars inside any function of the
+module.
 
    "insmod mymodule.ko num=15 str=some_str"
 
 [ ] make
-[ ] sudo insmod mymodule.ko num=15 str=some_str
+[ ] insmod mymodule.ko num=15 str=some_str
 [ ] lsmod | grep mymodule
 mymodule               16384  0
 [ ] dmesg | tail
-[ 6314.163554] Hello, Linux Kernel. num = 15, str = some_str
-[ ] sudo rmmod mymodule
+[14756.402306] Hello, Linux Kernel. num = 15, str = some_str
+[ ] echo 1 > /sys/module/mymodule/parameters/num
+[ ] rmmod mymodule
 [ ] dmesg | tail
-[ 6424.495854] Bye, Linux Kernel. num = 15, str = some_str
+[14804.154651] Bye, Linux Kernel. num = 1, str = some_str
+
+Also, we can use command 'modinfo' to find out the details about our module as
+below:
+
+[ ] modinfo mymodule.ko
+filename:       /home/manish/Documents/git_linux/learn/module_params/mymodule.ko
+description:    Module with parameters
+author:         Manish
+license:        GPL
+srcversion:     6D94CBB76F3348D7018D925
+depends:
+retpoline:      Y
+name:           mymodule
+vermagic:       5.11.0-40-generic SMP mod_unload modversions
+parm:           num:int
+parm:           str:charp

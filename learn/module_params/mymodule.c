@@ -6,10 +6,10 @@ MODULE_AUTHOR("Manish");
 MODULE_DESCRIPTION("Module with parameters");
 
 static int num = 5;
-module_param(num, int, 0660);
+module_param(num, int, S_IWUSR|S_IRUSR);
 
 static char *str = "string arg";
-module_param(str, charp, 0660);
+module_param(str, charp, S_IWUSR|S_IRUSR);
 
 static int __init my_module_init(void)
 {
