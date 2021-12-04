@@ -1,0 +1,26 @@
+This program is just to show, how we can pass parameters to a Linux kernel
+module.
+
+Just define a global variable and then make it as a module parameter with the
+use of 'module_param' function.
+
+For example,
+
+static int num = 5;
+module_param(num, int, 0660);
+
+static char *str = "string arg";
+module_param(str, charp, 0660);
+
+Then, We can use these variables inside any other functions of this Linux kernel
+module.
+
+[ ] make
+[ ] sudo insmod mymodule.ko
+[ ] lsmod | grep mymodule
+mymodule               16384  0
+[ ] dmesg | tail
+[ 5864.593807] Hello, Linux Kernel. num = 5, str = string arg
+[ ] sudo rmmod mymodule
+[ ] dmesg | tail
+[ 5885.700191] Bye, Linux Kernel. num = 5, str = string arg
