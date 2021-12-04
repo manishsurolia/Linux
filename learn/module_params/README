@@ -12,15 +12,18 @@ module_param(num, int, 0660);
 static char *str = "string arg";
 module_param(str, charp, 0660);
 
-Then, We can use these variables inside any other functions of this Linux kernel
-module.
+Then, we can pass the values to these parameters while inserting this linux
+kernel module as below example, and use these global vars inside any function of
+the module.
+
+   "insmod mymodule.ko num=15 str=some_str"
 
 [ ] make
-[ ] sudo insmod mymodule.ko
+[ ] sudo insmod mymodule.ko num=15 str=some_str
 [ ] lsmod | grep mymodule
 mymodule               16384  0
 [ ] dmesg | tail
-[ 5864.593807] Hello, Linux Kernel. num = 5, str = string arg
+[ 6314.163554] Hello, Linux Kernel. num = 15, str = some_str
 [ ] sudo rmmod mymodule
 [ ] dmesg | tail
-[ 5885.700191] Bye, Linux Kernel. num = 5, str = string arg
+[ 6424.495854] Bye, Linux Kernel. num = 15, str = some_str
