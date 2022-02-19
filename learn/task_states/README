@@ -66,18 +66,35 @@ anytime take this task and start to execute.
 Example of this is signal1.c in this same folder.
 
 Here, once 'getchar' is called, this task is put in the 'IO wait queue', and
-'__state' is set to 'TASK_INTERRUPTIBLE'. Meaning, suppose when it was waiting
-for an input from user, if you press ctrl-c, this task will be moved to the
-'runnable queue' by setting 'TASK_RUNNING' to the '__state' of the task, then
-scheduler will schedule this task at time time, execution of the signal handler
-for the same signal will happen, and again the task will come back to the
-'IO wait queue' by setting up 'TASK_INTERRUPTIBLE' in '__state' and again
+'__state' is set to 'TASK_INTERRUPTIBLE'(S). Meaning, suppose when it was
+waiting for an input from user, if you press ctrl-c, this task will be moved to
+the 'runnable queue' by setting 'TASK_RUNNING' to the '__state' of the task,
+then scheduler will schedule this task at some time, execution of the signal
+handler for the same signal will happen, and again the task will come back to
+the 'IO wait queue' by setting up 'TASK_INTERRUPTIBLE' in '__state' and again
 continue to wait for the input from user as before.
-This is an example of 'TASK_INTERRUPTIBLE'.
+This is an example of 'TASK_INTERRUPTIBLE'(S).
 
 -------------------------------------------
 [ ] gcc signal1.c
 [ ] ./a.out
+Calling getchar() is putting me in 'TASK_INTERRUPTABLE' state.
+When I am in 'TASK_INTERRUPTABLE' state, any 'ctrl-c' signal to
+me will put me back to the 'TASK_RUNNING' state and sig_handler
+function will be called and then again I will be moved to
+'TASK_INTERRUPTABLE' state. When an input required by 'getchar'
+is passed to me, I will be again moved to 'TASK_RUNNING' state
+and continue with the executeion of 'getchar' in main.
+
+Note : Here, if you check the status of this process in another window as below,
+you will find that the process is in 'TASK_INTERRUPTABLE'(s) state.
+
+[ ] ps -aeo args,state | grep a.out
+./a.out                     S
+
+Now, if you press ctrl-c, you will see the below outout. after this you can just
+enter, and come out of the program, as below:
+
 ^CI am main task's sig_handler. Wont die..
 ^CI am main task's sig_handler. Wont die..
                                            <-- Enter pressed here.
