@@ -1,0 +1,58 @@
+This program is to print details of a 'task_struct' based on the passed pid.
+
+Below is the core logic of the program which iterate through all the
+'task_struct' nodes of the task list, and find the node with the pid and then
+just print details of the same.
+
+static void print_task_info(unsigned int pid)
+{
+    struct task_struct *task_list;
+    for_each_process(task_list) {
+        if (task_list->pid == pid) {
+            pr_info("Process: %s\t PID:[%d]\t State:%s\n",
+                    task_list->comm, task_list->pid,
+                    get_task_state(task_list->state));
+        }
+    }
+    return;
+} 
+
+Function 'for_each_process' traverse through all the nodes of task link list,
+which is a doubly link list and find out and print the details of a specific
+'pid' number.
+
+Below is the process of building, loading and usage of the module.
+
+Module build:
+------------
+
+[ ] make
+
+Module load:
+------------
+
+[ ] insmode mymodule.ko
+
+Module usage:
+------------
+
+This module has a parameter and a callback written for it. Once we load this
+module in the linux kernel, there is a parameter created with this path,
+'/sys/module/mymodule/parameters/arg'.
+
+After loading this module, when you put some value to this parameter using
+'echo', it will invoke the callback function and take the value from the arg,
+and pass it down to 'print_task_info' to get the details about that task.
+Hence, do this,
+
+echo 'pid' > /sys/module/mymodule/parameters/arg
+
+for example,
+
+echo 4463 >  /sys/module/mymodule/parameters/arg
+
+It will simply perint the details about this process number '4463'. You can
+check it with 'dmesg | tail'.
+
+[ ] dmesg | tail
+[ 3406.132493] Process: a.out	 PID:[4463]	 State:TASK_RUNNING
