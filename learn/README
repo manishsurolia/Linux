@@ -8,6 +8,7 @@ Hence, we can divide all the sub-sections as below:
         1. module_hello_world
         2. module_params
         3. module_params_callback
+        4. module_print_task_detail
 
     2. Information about Linux kernel.
         1. basic_info
