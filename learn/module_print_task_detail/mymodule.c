@@ -24,16 +24,26 @@ char * get_task_state(long state)
     }
 }
 
-static void print_task_info(unsigned int pid)
+static void print_task_info(unsigned int tgid)
 {
-    struct task_struct *task_list;
-    for_each_process(task_list) {
-        if (task_list->pid == pid) {
-            pr_info("Process: %s\t PID:[%d]\t State:%s\n",
-                    task_list->comm, task_list->pid,
-                    get_task_state(task_list->state));
+    struct task_struct *the_process;
+    struct task_struct *the_thread;
+    char comm[TASK_COMM_LEN];
+
+    rcu_read_lock();
+    for_each_process(the_process) {
+        if (task_tgid_nr(the_process) == tgid) {
+            pr_info("process node: %p\n", the_process);
+            for_each_thread(the_process, the_thread) {
+                pr_info("thread node: %p\t Name: %s\t PID:[%d]\t TGID:[%d]\t STATE:[%s]\n",
+                        the_thread, get_task_comm(comm, the_thread),
+                        task_pid_nr(the_thread), task_tgid_nr(the_thread),
+                        get_task_state(the_thread->state));
+            }
+            break;
         }
     }
+    rcu_read_unlock();
     return;
 }
 

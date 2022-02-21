@@ -1,21 +1,32 @@
 This program is to print details of a 'task_struct' based on the passed pid.
 
 Below is the core logic of the program which iterate through all the
-'task_struct' nodes of the task list, and find the node with the pid and then
-just print details of the same.
+'task_struct' nodes of the task list, and find the node with the pid and also
+find the 'task_struct' nodes for the related threads then just print details of
+the same.
 
-static void print_task_info(unsigned int pid)
+static void print_task_info(unsigned int tgid)
 {
-    struct task_struct *task_list;
-    for_each_process(task_list) {
-        if (task_list->pid == pid) {
-            pr_info("Process: %s\t PID:[%d]\t State:%s\n",
-                    task_list->comm, task_list->pid,
-                    get_task_state(task_list->state));
+    struct task_struct *the_process;
+    struct task_struct *the_thread;
+    char comm[TASK_COMM_LEN];
+
+    rcu_read_lock();
+    for_each_process(the_process) {
+        if (task_tgid_nr(the_process) == tgid) {
+            pr_info("process node: %p\n", the_process);
+            for_each_thread(the_process, the_thread) {
+                pr_info("thread node: %p\t Name: %s\t PID:[%d]\t TGID:[%d]\t STATE:[%s]\n",
+                        the_thread, get_task_comm(comm, the_thread),
+                        task_pid_nr(the_thread), task_tgid_nr(the_thread),
+                        get_task_state(the_thread->state));
+            }
+            break;
         }
     }
+    rcu_read_unlock();
     return;
-} 
+}
 
 Function 'for_each_process' traverse through all the nodes of task link list,
 which is a doubly link list and find out and print the details of a specific
@@ -55,4 +66,37 @@ It will simply perint the details about this process number '4463'. You can
 check it with 'dmesg | tail'.
 
 [ ] dmesg | tail
-[ 3406.132493] Process: a.out	 PID:[4463]	 State:TASK_RUNNING
+[ 1765.202841] process node: 000000007516bd93
+[ 1765.202847] thread node: 000000007516bd93	 Name: a.out	 PID:[3263]	 TGID:[3263]	 STATE:[TASK_RUNNING]
+[ 1765.202850] thread node: 0000000060f89353	 Name: a.out	 PID:[3264]	 TGID:[3263]	 STATE:[TASK_RUNNING]
+[ 1765.202852] thread node: 0000000081d1d95a	 Name: a.out	 PID:[3265]	 TGID:[3263]	 STATE:[TASK_RUNNING]
+[ 1765.202854] thread node: 0000000042b65549	 Name: a.out	 PID:[3266]	 TGID:[3263]	 STATE:[TASK_RUNNING]
+[ 1765.202856] thread node: 0000000072af4703	 Name: a.out	 PID:[3267]	 TGID:[3263]	 STATE:[TASK_RUNNING]
+
+Note : All Linux threads are maintained in hierarchal form.
+"(task_struct *)->signal->thread_head" is the list of all threads, which belongs
+to the same tgid(thread group id, which is actually the PID of main thread).
+  ________________    ________________    ________________
+ |                |   |               |   |               |
+ |  Main thread   |   |  Main thread  |   | Main thread   |---->
+ | 'task_struct'  |-->| 'task_struct' |-->| 'task_struct' |
+ |                |   |               |   |               |
+ -----------------    ----------------    ----------------
+         |                   |                   |
+         |                   |                   |
+        \|/                 \|/                 \|/
+       signal               signal              signal
+         |                   |                   |
+         |                   |                   |
+        \|/                 \|/                 \|/
+ 'threads link list'  'threads link list'  'threads link list'
+    (task_struct)       (task_struct)        (task_struct)
+
+So, here you can see that there is one top link list of the all the
+'main threads' created as part of different processes and each node of this link
+list contains a pointer to signal, and this 'signal' pointer has link list of
+all the threads (task_struct). The very first element in this 'threads link
+list' is the 'Main thread' task_struct structure.
+
+Note : The 'pid' of the main task becomes 'tgid' for all the tasks which share
+the same virtual memory/resources.
