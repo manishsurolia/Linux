@@ -1,4 +1,64 @@
-This program is to print details of a 'task_struct' based on the passed pid.
+This program is to print details of 'task_struct' based on the passed 'tgid'.
+
+Background:
+
+    -   In Linux, everything is executed as a thread and the same is represented
+        as 'task_struct' structure in Linux kernel.
+
+    -   A program, which does not explicitly create a thread using
+        'pthread_create' also has a thread.
+
+    -   Linux scheduler schedules differnet threads, available in the form of
+        'task_struct' sturctures in the linux kernel.
+
+    -   'pthread_create()' creates a new thread(task_struct), which use the same
+        memory regions of the thread which created it.
+
+    -   'fork()' also creates a new thread(task_struct), which does NOT use the
+        same region of the thread which created it. Newly created thread with
+        'fork()' has its own memory regions.
+
+    -   Every thread's pid (task_struct->pid) is different. For example, if the
+        first thread creates another four threads, all five threads(task_struct)
+        will have their own different 'pid'.
+
+    -   Every thread (task_struct) has 'tgid' (thread group id) as well, along
+        with 'pid'. This 'tgid' is same as 'pid' of the first thread that was
+        created when the program was loaded in memory and started. Hence, as per
+        the last example, all five threads will have 'tgid' same as the 'pid' of
+        the first thread.
+
+    -   Dont rely on 'getpid()' inside a thread execution. It just gives you the
+        'pid' of the main thread. Means, 'tgid' of this group of the threads.
+
+    -   All tasks which use the same memory regions are hierarichally
+        represented. Check at the end of this README for more detail on how
+        other threads are represented for the first created thread.
+
+Below is a good diagram taken from this stackoverflow link.
+https://stackoverflow.com/questions/9305992/if-threads-share-the-same-pid-how-can-they-be-identified
+
+                              USER VIEW
+                              vvvv vvvv
+                   |
+     <-- PID 43 -->|<----------------- PID 42 ----------------->
+                   |                           |
+                   |      +---------+          |
+                   |      | process |          |
+                   |     _| pid=42  |_         |
+              __(fork) _/ | tgid=42 | \_ (new thread) _
+             /     |      +---------+          |       \
+     +---------+   |                           |    +---------+
+     | process |   |                           |    | process |
+     | pid=43  |   |                           |    | pid=44  |
+     | tgid=43 |   |                           |    | tgid=42 |
+     +---------+   |                           |    +---------+
+                   |                           |
+     <-- PID 43 -->|<--------- PID 42 -------->|<--- PID 44 --->
+                   |                           |
+                             ^^^^^^ ^^^^
+                             KERNEL VIEW
+
 
 Below is the core logic of the program which iterate through all the
 'task_struct' nodes of the task list, and find the node with the pid and also
@@ -28,9 +88,15 @@ static void print_task_info(unsigned int tgid)
     return;
 }
 
-Function 'for_each_process' traverse through all the nodes of task link list,
-which is a doubly link list and find out and print the details of a specific
-'pid' number.
+Function 'for_each_process' traverse through all the nodes of global task link
+list, which is a doubly link list.  With the use of 'for_each_process' we can
+find out and print the details of a specific 'pid' number.
+
+Function 'for_each_thread' traverse through all the threads task_struct's.
+
+Here, the global list of the 'task_struct', you can assume as all the processes
+in the device, and all the internal list of 'task_struct' represent the list
+of all threads.
 
 Below is the process of building, loading and usage of the module.
 
@@ -94,7 +160,7 @@ to the same tgid(thread group id, which is actually the PID of main thread).
 
 So, here you can see that there is one top link list of the all the
 'main threads' created as part of different processes and each node of this link
-list contains a pointer to signal, and this 'signal' pointer has link list of
+list contains a pointer to 'signal', and this 'signal' pointer has link list of
 all the threads (task_struct). The very first element in this 'threads link
 list' is the 'Main thread' task_struct structure.
 
