@@ -1,0 +1,137 @@
+This program is to print details of 'struct page' used by Linux to maintain
+all the pages present in the main memory.
+
+Background:
+---------
+
+The very smallest unit of memory for MMU is a page. MMU manages whole physical
+memory in terms of pages. We can also call them page frames of the physical
+memory. Most of the 32-bit architectures have page size as 4096 bytes (4KB).
+
+We can easily calculate the total number of page frames available in a 32-bit
+byte addressable RAM.
+
+Here, 32-bit RAM meaning that each byte of the RAM(main memory) is represented
+with the use of 32-bits. Hence, we can use different combination of these
+32-bits to access different addresses in this RAM.
+
+So, how many bytes are present in a 32-bit addressable RAM?
+
+    = 2^32  = 4294967296 bytes.
+
+Now, as per the above description, assume that a 32-bit architecture have
+PAGE_SIZE as 4096 bytes(4KB).
+
+so, total page frames available in this 32-bit addressable RAM is :
+    = 4294967296/4096 = 1048576 page frames.
+
+We can represent this RAM as below:
+
+            ----------------------- <--- 0x00000000
+            |                     |
+            |    PAGE FRAME 1     |
+            | (size : 4096 bytes) |
+            |                     |
+            ----------------------- <--- 0x00001000
+            |                     |
+            |   PAGE FRAME 2      |
+            | (size : 4096 bytes) |
+            |                     |
+            ----------------------- <--- 0x00002000
+            |                     |
+            |   PAGE FRAME 3      |
+            | (size : 4096 bytes) |
+            |                     |
+            ----------------------- <--- 0x00003000
+            |                     |
+            |   PAGE FRAME 4      |
+            | (size : 4096 bytes) |
+            |                     |
+            ----------------------- <--- 0x00004000
+            |                     |
+            |   PAGE FRAME 5      |
+            | (size : 4096 bytes) |
+            |                     |
+            ----------------------- <--- 0x00005000
+            |                     |
+            |   PAGE FRAME 6      |
+            | (size : 4096 bytes) |
+            |                     |
+            ----------------------- <--- 0x00006000
+            |                     |
+            |        |            |
+            |        |            |
+            |        |            |
+            |        |            |
+            |        |            |
+            |        |            |
+            |        |            |
+            |        |            |
+            |        |            |
+            |        |            |
+            |        |            |
+            |        |            |
+            |        |            |
+            |       \|/           |
+            |                     |
+            |                     |
+            ----------------------- <---- 0xFFFFEFFF
+            |                     |
+            | PAGE FRAME 1048576  |
+            | (size : 4096 bytes) |
+            |                     |
+            ----------------------- <---- 0xFFFFFFFF
+
+             32-bit byte addressable RAM
+             ---------------------------
+
+Hence, total of 1048576 physical page frames are present in a 32-bit byte
+addressable RAM.
+
+To keep record of all these pages, Linux uses this below structure in file
+<linux/mm_types.h>.
+
+Below, only few important members are shown in the 'struct page'. You can go
+through the file <linux/mm_types.h> to check the complete structure.
+
+struct page {
+    unsigned long flags;
+    -----
+    atomic_t _count;
+    atomic_t _mapcount;
+    unsigned long private;
+    struct address_space *mapping;
+    pgoff_t index;
+    struct list_head lru;
+    void *virtual;
+    -----
+}; 
+
+Each page frame of the main memory is maintained with the use of this structure.
+and there are total 1048576 page frames in our 32-bit addressable RAM. So,
+let's see how much memory is needed to keep record of all the page frames in
+RAM.
+
+    = size of 'struct page' * total_page_frames
+    = sizeof(struct page) * 1048576;
+
+Let's write a kernel module to find the size of 'struct page'. We just need to
+include the file <linux/mm_types.h> and print the sizeof(struct page).
+
+Please check the file 'page_info.c' file complete details.
+
+[ ] make
+
+[ ] insmod page_info.ko
+
+[ ] dmesg | tail
+[ 3871.663557] Hello, Linux Kernel
+[ 3871.663560] Size of 'struct page' is : 64 bytes 
+
+So, you can see that to maintain each page frame, Linux needs 64 bytes.
+
+Hence, to keep record of all page frames, Linux need :
+    = 64 * 1048576 bytes
+    = 67108864 bytes
+    = 16384 pages
+    = 1.5% of total RAM
