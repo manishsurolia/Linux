@@ -9,6 +9,7 @@ Hence, we can divide all the sub-sections as below:
         2. module_params
         3. module_params_callback
         4. module_print_task_detail
+        5. module_page_info
 
     2. Information about Linux kernel.
         1. basic_info
