@@ -38,21 +38,21 @@ of this array are the 'file descriptors' returned by 'open' system call.
 
 We can think of these indexs as below:
 
-	   0-----------------
-		| File pointer0 |
-	   1-----------------
-		| File pointer1 |
-	   2-----------------
-		| File pointer2 |
-	   3-----------------
-		| File pointer3 |
-	   4-----------------
-		| File pointer4 |
-	   5-----------------
-		|      	|       |
-				|
-				|
-			   \|/	
+       0-----------------
+        | File pointer0 |
+       1-----------------
+        | File pointer1 |
+       2-----------------
+        | File pointer2 |
+       3-----------------
+        | File pointer3 |
+       4-----------------
+        | File pointer4 |
+       5-----------------
+        |       |       |
+                |
+                |
+               \|/
 
 
 We can find the maximum allowed files per process as below:
@@ -67,24 +67,24 @@ per process.
 Hence, our per process FD complete array looks like below,
 
 
-	   0-----------------
-		| File pointer0 |
-	   1-----------------
-		| File pointer1 |
-	   2-----------------
-		| File pointer2 |
-	   3-----------------
-		| File pointer3 |
-	   4-----------------
-		| File pointer4 |
-	   5-----------------
-		|      	|       |
-		|		|		|
-		|		|		|
-		|	   \|/		|
-	1023-----------------
-		|      	        |
-		-----------------
+       0-----------------
+        | File pointer0 |
+       1-----------------
+        | File pointer1 |
+       2-----------------
+        | File pointer2 |
+       3-----------------
+        | File pointer3 |
+       4-----------------
+        | File pointer4 |
+       5-----------------
+        |       |       |
+        |       |       |
+        |       |       |
+        |      \|/      |
+    1023-----------------
+        |               |
+        -----------------
 
 Each index here, represents a file descriptor.
 
