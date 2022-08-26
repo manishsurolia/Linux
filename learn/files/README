@@ -1,0 +1,146 @@
+(1) What is a file?
+------------------
+A file is simply a linear array of bytes, each of which we can read or write.
+Each file has a low level name, usually a number(inode number) and often a user
+is now aware of this name.
+
+
+(2) What is a directory?
+-----------------------
+A directory is also a file(has inode number), but it contains list of
+"user-readable name, low-level name(inode number)" pairs.
+
+A directory file, can have a pair of 'user-readable name, low-level
+name(inode number)' for another directory. By placing directories within other
+directories, users build 'directory tree'(directory hierarchy).
+
+The 'directory hierarchy' starts at a root directory(generally referred as /).
+
+Note : In Linux, everything is represented as a file. Like, devices, pipes,
+and even processes.
+
+(3) How to create a file?
+------------------------
+
+'open' system call can be used to read, write and even create a new file.
+An example of 'open' system call is as below,
+
+int fd = open("foo", O_CREAT|O_WRONLY|O_TRUNC, S_IRUSR|S_IWUSR);
+
+'open' system call returns an integer(called a 'file descriptor'), when
+successful.
+
+This integer is nothing but an index of array maintained per process wise(not
+system wide array, its just per process), referred as 'File descriptor table'.
+
+Each process has an array, where each element points to a file pointer. Indexes
+of this array are the 'file descriptors' returned by 'open' system call.
+
+We can think of these indexs as below:
+
+	   0-----------------
+		| File pointer0 |
+	   1-----------------
+		| File pointer1 |
+	   2-----------------
+		| File pointer2 |
+	   3-----------------
+		| File pointer3 |
+	   4-----------------
+		| File pointer4 |
+	   5-----------------
+		|      	|       |
+				|
+				|
+			   \|/	
+
+
+We can find the maximum allowed files per process as below:
+
+[ ] cat /proc/1245/limits | grep 'Max open files'
+Max open files            1024                 524288               files
+
+The entries here are 'soft limit', 'hard limit' and 'Units'. We can read about
+all these separately, but lets consider that we can create maximum 1024 files
+per process.
+
+Hence, our per process FD complete array looks like below,
+
+
+	   0-----------------
+		| File pointer0 |
+	   1-----------------
+		| File pointer1 |
+	   2-----------------
+		| File pointer2 |
+	   3-----------------
+		| File pointer3 |
+	   4-----------------
+		| File pointer4 |
+	   5-----------------
+		|      	|       |
+		|		|		|
+		|		|		|
+		|	   \|/		|
+	1023-----------------
+		|      	        |
+		-----------------
+
+Each index here, represents a file descriptor.
+
+Any running process already have 3 indexes(3 file descriptors) used. A
+file pointer at index 0 points to 'standard input', a file pointer at index 1
+points to 'standard output', and a file pointer at index 2 points to
+'standard error'. These are represented as file descriptors 0, 1 and 2
+respectively. Thus, a new file opened in a process, will get file descriptor
+as 3 and above.
+
+4. Open file table:
+------------------
+Linux maintains a global system-wide 'open file table'. Each entry in this
+table tracks which underlying file the descriptor refers to, the current
+offset, and other relevant details such as whether the file is readable or
+writable. An 'Open file table' maintains a list of open files in the system.
+
+'File descriptor table' as mentioned in earlier section, has pointers to 'Open
+file table'.
+
+5. v-node table:
+---------------
+
+A v-node table is again a system wide table, where each entry in this table
+refers to a file. Its an abstraction to the real file management in Linux.
+For example, if the below file system is EXT3, then in the OS, system calls
+interact only with the v-node table, it does not know what file system is
+managing the files below.
+
+6. File access scenarios:
+------------------------
+
+Let's see how files are referred by multiple processes in Linux. We can
+categorise them as below:
+
+(a) One process opens a single file
+-----------------------------------
+
+    Descriptor							Open file table
+	Table								(shared by all processes)
+	(One table,
+	per process)                        |
+
+     ----------
+ FD0 |		  |
+     ----------
+ FD1 |		  |
+     ----------
+ FD2 |		  |
+     ----------
+ FD3 |		  |
+     ----------
+ FD4 |		  |
+     ----------
+		|
+	   \|/
+
+
+
