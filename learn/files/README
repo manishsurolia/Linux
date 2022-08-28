@@ -62,7 +62,7 @@ We can find the maximum allowed files per process as below:
 Max open files            1024                 524288               files
 
 The entries here are 'soft limit', 'hard limit' and 'Units'. We can read about
-all these separately, but lets consider that we can create maximum 1024 files
+all these separately, but let's consider that we can create maximum 1024 files
 per process.
 
 Hence, our per process FD complete array looks like below,
@@ -381,9 +381,39 @@ instead of starting from 0. That is the reason we see output of "ONE TWO".
 'dup' system call is used to duplicate an already existing file descriptor.
 'dup' just takes one file descriptor and return another file descriptor, which
 points to the same entry in 'open file table'. Means, both of the file
-descriptors share the same 'offset' and everthing else in the 'open file table'
+descriptors share the same 'offset' and everything else in the 'open file table'
 entry, which is pointed by both the file descriptors.
 
+
+    "Descriptor        "Open files table"            "V-node table"
+	Table"             (shared by                    (Info about a
+	(One table,        all processes)               file on Disk, shared
+	per process)                                    by all processes)
+
+  P1 descriptor tbl                                                  .
+      (Parent)
+|------------------|    |                   |       |___________________| File X
+|                  |    |      File X       |  |--->|   File permission |
+|     ------------ |    |___________________|  |    |___________________|
+| FD0 |          | | -->|      .            |  |    |   File size       |
+|     ------------ | |  |      .            |  |    |___________________|
+| FD1 |          | | |  |  refcnt = 2       |  |    |   File Type       |
+|     ------------ | |  |  offset = 0       |__|    |___________________|
+| FD2 |          | | |  |(offset is shared) |       |      .            |
+|     ------------ | |  |___________________|       |      .            |
+| FD3 |          |-|--  |                   |       |      .            |
+|     ------------ | |  |                   |       |      .            |
+| FD4 |          |-|-|                              |      .            |
+|     ------------ |                                |___________________| File Y
+|          |       |                                |   File permission |
+|         \|/      |                                |___________________|
+|------------------|                                |   File size       |
+                                                    |___________________|
+                                                    |   File Type       |
+                                                    |                   |
+                                                    |___________________|
+                                                    |      .            |
+                                                    |      .            |
 [ ] rm -rf somefile.txt
 [ ] gcc test5.c
 [ ] ./a.out
@@ -393,7 +423,7 @@ ONE TWO
 7. lseek (offset):
 -----------------
 
-'lseek' sysetem call helps to change the value of offset, and then read/write
+'lseek' system call helps to change the value of offset, and then read/write
 data in any file at a particular offset in a file.
 
 off_t lseek(int fields, off_t offset, int whence);
@@ -407,3 +437,62 @@ If whence is SEEK_CUR, the offset is set to its current location plus offset
 bytes.
 If whence is SEEK_END, the offset is set to the size of the file plus offset
 bytes.
+
+8. mmap():
+---------
+
+'mmap' just creates space for a file in 'virtual address space' of a process.
+This means, that 'mmap' fits a portion or file(for complete file) in main
+memory (based on the size provided in 'mmap' call).
+
+The benefit of doing memory mapping of 'hard disk space' in 'main memory' is
+that it avoids overhead of accessing the disk multiple times, and rather have
+a copy of disk space of a file in memory, and keep reading/writing on it and
+this copy of file data in main memory is written back to the hard disk in some
+timely manner.
+
+If you want to immediately sync up the mmap'ed memory to the hard disk(rather
+than waiting for OS to do the same), you can use 'fsync' system call as
+'fsync(int fd)'.
+
+For example,
+
+Let's say we have a small file with size of 11 bytes.
+
+[ ] echo 1234567890 > myfile
+[ ] ls -lart myfile
+-rw-r--r--  1 root root    11 Aug 28 17:50 myfile
+
+
+Now, let's write some code to open this file and map it in the main memory.
+Below is a simple code snippet to see how virtual memory space changes with
+a mmap.
+
+    =======================================================================
+    int fd = open("./myfile", O_RDWR, S_IRUSR|S_IWUSR);
+    // Check the process virtual maps using /proc/<pid>/maps here,
+    // then press enter.
+    getchar();
+    char *file_in_memory = mmap(NULL, 11, PROT_READ | PROT_WRITE, MAP_SHARED,
+                           fd, 0);
+    // Check the process virtual memory maps using /proc/<pid>/maps here,
+    // then press enter.
+    getchar();
+    =======================================================================
+
+Note here that, we just opened a file using 'open' file descriptor, and passed
+this 'file descriptor' in the mmap system call.
+
+'mmap' defines memory in virtual address space with the size of required pages.
+Here, one page is sufficient for the provided size (11 bytes) in mmap, so mmap
+will simply associate one page in the virtual address space of the process for
+this file.
+
+Please refer test6.c to check this.
+
+[ ] gcc test6.c
+[ ] ./a.out
+Check the virtual memory map(/proc/2667/maps) and press enter.
+
+Check the virtual memory map(/proc/2667/maps) again. You will see an extra entry
+of 1 page for the mmap'ed file.
