@@ -496,3 +496,10 @@ Check the virtual memory map(/proc/2667/maps) and press enter.
 
 Check the virtual memory map(/proc/2667/maps) again. You will see an extra entry
 of 1 page for the mmap'ed file.
+
+Here, we can do more experiments with this, for example,
+(1) With more size of file, ask mmap to allocate less size in virtual memory
+maps and vice versa. Check the virtual memory maps.
+(2) mmap a small fize (1 PAGE) file, and just keep writing the file as multiple
+pages, and see whether virtual address space increase the size of the mapped
+memory or not and why?
