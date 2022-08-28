@@ -259,14 +259,14 @@ process.
 Since, both of the file descriptors have different entries in 'open file table',
 both of them have different 'offset' value, each one of them pointing to
 starting of the table (0). So, when 'write' call happens for the second file,
-it overwrites the data written by the first file descriptor. 
+it overwrites the data written by the first file descriptor.
 
 [ ] rm -rf somefile.txt
 [ ] gcc test3.c
 [ ] ./a.out
 [ ] cat somefile.txt
 TWO
- 
+
 (d) Two unrelated processes open the same file
 ----------------------------------------------
 
@@ -374,3 +374,36 @@ offset between both of them. Due to this when first 'fd' write something in the
 file, the 'offset' values increases, and then when the write happens with the
 second 'fd', the actual file write happens at the last updated offset value
 instead of starting from 0. That is the reason we see output of "ONE TWO".
+
+(f) 'dup' system call
+---------------------
+
+'dup' system call is used to duplicate an already existing file descriptor.
+'dup' just takes one file descriptor and return another file descriptor, which
+points to the same entry in 'open file table'. Means, both of the file
+descriptors share the same 'offset' and everthing else in the 'open file table'
+entry, which is pointed by both the file descriptors.
+
+[ ] rm -rf somefile.txt
+[ ] gcc test5.c
+[ ] ./a.out
+[ ] cat somefile.txt
+ONE TWO
+
+7. lseek (offset):
+-----------------
+
+'lseek' sysetem call helps to change the value of offset, and then read/write
+data in any file at a particular offset in a file.
+
+off_t lseek(int fields, off_t offset, int whence);
+
+fields = file descriptor (fd).
+offset = provide the offset value, where you want to set the file offset.
+whence = defines how the seek is preformed.
+
+If whence is SEEK_SET, the offset is set to offset bytes.
+If whence is SEEK_CUR, the offset is set to its current location plus offset
+bytes.
+If whence is SEEK_END, the offset is set to the size of the file plus offset
+bytes.
