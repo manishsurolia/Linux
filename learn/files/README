@@ -2,12 +2,12 @@
 ------------------
 A file is simply a linear array of bytes, each of which we can read or write.
 Each file has a low level name, usually a number(inode number) and often a user
-is now aware of this name.
+is not aware of this name.
 
 
 (2) What is a directory?
 -----------------------
-A directory is also a file(has inode number), but it contains list of
+A directory is also a file(has inode number), but it contains a list of
 "user-readable name, low-level name(inode number)" pairs.
 
 A directory file, can have a pair of 'user-readable name, low-level
@@ -22,7 +22,8 @@ and even processes.
 (3) How to create a file?
 ------------------------
 
-'open' system call can be used to read, write and even create a new file.
+'open' system call can be used to create a new file or open an already existing
+file.
 An example of 'open' system call is as below,
 
 int fd = open("foo", O_CREAT|O_WRONLY|O_TRUNC, S_IRUSR|S_IWUSR);
@@ -118,29 +119,258 @@ managing the files below.
 ------------------------
 
 Let's see how files are referred by multiple processes in Linux. We can
-categorise them as below:
+have multiple scenarios like below:
 
-(a) One process opens a single file
------------------------------------
+(a) A process opens a single file
+---------------------------------
 
-    Descriptor							Open file table
-	Table								(shared by all processes)
-	(One table,
-	per process)                        |
-
-     ------------
- FD0 |          |
-     ------------
- FD1 |          |
-     ------------
- FD2 |          |
-     ------------
- FD3 |          |
-     ------------
- FD4 |          |
-     ------------
-          |
-         \|/
+    "Descriptor        "Open files table"            "V-node table"
+	Table"             (shared by                    (Info about a
+	(One table,        all processes)               file on Disk, shared
+	per process)                                    by all processes)
 
 
+  P1 descriptor
+  table                                                   File X
+ __________________     |                   |       |___________________|
+|                  |    |      File X       |  |--->|   File permission |
+|     ------------ |    |___________________|  |    |___________________|
+| FD0 |          | | -->|      .            |  |    |   File size       |
+|     ------------ | |  |      .            |  |    |___________________|
+| FD1 |          | | |  |  refcnt = 1       |  |    |   File Type       |
+|     ------------ | |  |  offset = 0       |__|    |___________________|
+| FD2 |          | | |  |___________________|       |      .            |
+|     ------------ | |  |                   |       |      .            |
+| FD3 |          |----  |                   |       |      .            |
+|     ------------ |    |                   |       |                   |
+| FD4 |          | |    |                   |       |                   |
+|     ------------ |    |                   |       |                   |
+|          |       |    |                   |       |                   |
+|         \|/      |    |                   |       |                   |
+|__________________|
 
+Here, Process 'p1' opened a single file. So, it has an entry in its 'descriptor
+table'. Also, global 'open files table' also has an entry related to it. Also,
+the global V-node table also has an entry for this, which finally provides the
+data from the file. Here, the 'refcnt' also holds the value '1', as there is
+only one reference to this file, because only one 'open' call used to open this
+file.
+When the file is opened, the 'fd' points to the starting of the file, hence,
+'offset' is 0.
+
+Refer 'test1.c' for example of this case.
+
+[ ] rm -rf somefile.txt
+[ ] gcc test1.c
+[ ] ./a.out
+[ ] cat somefile.txt
+ONE TWO
+
+Every time a 'write' system call is used, the current 'offset' value from
+'open file table' is taken and used to write the data in the file. Thus, we have
+'TWO' after 'ONE' written in the file by this process.
+
+(b) A process opens two different files
+---------------------------------------
+
+    "Descriptor        "Open files table"            "V-node table"
+	Table"             (shared by                    (Info about a
+	(One table,        all processes)               file on Disk, shared
+	per process)                                    by all processes)
+
+  P1 descriptor                                          .
+  table                                                  .
+ ------------------     |                   |       |___________________| File X
+|                  |    |      File X       |  |--->|   File permission |
+|     |----------| |    |___________________|  |    |___________________|
+| FD0 |          | | -->|      .            |  |    |   File size       |
+|     ------------ | |  |      .            |  |    |___________________|
+| FD1 |          | | |  |  refcnt = 1       |  |    |   File Type       |
+|     ------------ | |  |  offset = 0       |__|    |___________________|
+| FD2 |          | | |  |___________________|       |      .            |
+|     ------------ | |  |                   |       |      .            |
+| FD3 |          |-|--  |                   |       |      .            |
+|     ------------ |    |                   |       |      .            |
+| FD4 |          |-|--  |      File Y       |       |      .            |
+|     ------------ | |  |___________________|       |___________________| File Y
+|          |       | |  |      .            |  |--->|   File permission |
+|         \|/      | |  |      .            |  |    |___________________|
+|                  | -->|   refcnt = 1      |  |    |   File size       |
+|__________________|    |   offset = 0      |__|    |___________________|
+                        |___________________|       |   File Type       |
+                        |                   |       |___________________|
+                        |                   |       |      .            |
+                        |                   |       |      .            |
+
+[ ] rm -rf somefile1.txt
+[ ] rm -rf somefile2.txt
+[ ] gcc test2.c
+[ ] ./a.out
+[ ] cat somefile1.txt
+ONE
+[ ] cat somefile2.txt
+TWO
+
+Here, both files are opened with two different 'file descriptors'. So, they
+have different entries in the 'Open file table'. Both the entries in 'Open file
+table' have refcnt as 1, as they are opened only once. Also, offset is also set
+to 0 for both of them.
+
+(c) A process opens the same file twice
+---------------------------------------
+
+    "Descriptor        "Open files table"            "V-node table"
+	Table"             (shared by                    (Info about a
+	(One table,        all processes)               file on Disk, shared
+	per process)                                    by all processes)
+
+  P1 descriptor                                          .
+  table                                                  .
+|------------------|    |                   |       |___________________| File X
+|                  |    |      File X       |  |--->|   File permission |
+|     ------------ |    |___________________|  |    |___________________|
+| FD0 |          | | -->|      .            |  |    |   File size       |
+|     ------------ | |  |      .            |  |    |___________________|
+| FD1 |          | | |  |  refcnt = 1       |  |    |   File Type       |
+|     ------------ | |  |  offset = 0       |__|    |___________________|
+| FD2 |          | | |  |___________________|  |    |      .            |
+|     ------------ | |  |                   |  |    |      .            |
+| FD3 |          |-|--  |                   |  |    |      .            |
+|     ------------ |    |                   |  |    |      .            |
+| FD4 |          |-|--  |      File X       |  |    |      .            |
+|     ------------ | |  |___________________|  |    |___________________| File Y
+|          |       | |  |      .            |  |    |   File permission |
+|         \|/      | |  |      .            |  |    |___________________|
+|------------------| -->|   refcnt = 1      |  |    |   File size       |
+                        |   offset = 0      |__|    |___________________|
+                        |___________________|       |   File Type       |
+                        |                   |       |___________________|
+                        |                   |       |      .            |
+                        |                   |       |      .            |
+
+Note : Here, as you can notice that if a file is opened twice in a process, we
+have 2 file descriptors in the 'descriptor table', and both of them have
+separate entries in the global 'open files table'. The reason is that both file
+descriptors open the file differently, they will write in the files at its own
+'offset', their permission might be different etc. Hence, we have two multiple
+entries in the 'Open files table' for the same files, when opened in the same
+process.
+
+Since, both of the file descriptors have different entries in 'open file table',
+both of them have different 'offset' value, each one of them pointing to
+starting of the table (0). So, when 'write' call happens for the second file,
+it overwrites the data written by the first file descriptor. 
+
+[ ] rm -rf somefile.txt
+[ ] gcc test3.c
+[ ] ./a.out
+[ ] cat somefile.txt
+TWO
+ 
+(d) Two unrelated processes open the same file
+----------------------------------------------
+
+    "Descriptor        "Open files table"            "V-node table"
+	Table"             (shared by                    (Info about a
+	(One table,        all processes)               file on Disk, shared
+	per process)                                    by all processes)
+
+  P1 descriptor tbl                                                  .
+|------------------|    |                   |       |___________________| File X
+|                  |    |      File X       |  |--->|   File permission |
+|     ------------ |    |___________________|  |    |___________________|
+| FD0 |          | | -->|      .            |  |    |   File size       |
+|     ------------ | |  |      .            |  |    |___________________|
+| FD1 |          | | |  |  refcnt = 1       |  |    |   File Type       |
+|     ------------ | |  |  offset = 0       |__|    |___________________|
+| FD2 |          | | |  |___________________|  |    |      .            |
+|     ------------ | |  |                   |  |    |      .            |
+| FD3 |          |-|--  |                   |  |    |      .            |
+|     ------------ |    |                   |  |    |      .            |
+| FD4 |          | |    |      File X       |  |    |      .            |
+|     ------------ |    |___________________|  |    |___________________| File Y
+|          |       |    |      .            |  |    |   File permission |
+|         \|/      |    |      .            |  |    |___________________|
+|------------------| -->|   refcnt = 1      |  |    |   File size       |
+                     |  |   offset = 0      |__|    |___________________|
+ P2 descriptor tbl   |  |___________________|       |   File Type       |
+|------------------| |  |                   |       |___________________|
+|                  | |  |                   |       |      .            |
+|     ------------ | |  |                   |       |      .            |
+| FD0 |          | | |
+|     ------------ | |
+| FD1 |          | | |
+|     ------------ | |
+| FD2 |          | | |
+|     ------------ | |
+| FD3 |          |-|--
+|     ------------ |
+| FD4 |          | |
+|     ------------ |
+|          |       |
+|         \|/      |
+|------------------|
+
+This case is same as case 'c', where each file descriptor had one entry in the
+'open file table', each one entry there holds a separate 'offset' pointer,
+pointing to location 0 of the file, and writing via the second file descriptor
+overwrite the file.
+
+(e) Two related(parent child) processes open the same file
+----------------------------------------------------------
+
+    "Descriptor        "Open files table"            "V-node table"
+	Table"             (shared by                    (Info about a
+	(One table,        all processes)               file on Disk, shared
+	per process)                                    by all processes)
+
+  P1 descriptor tbl                                                  .
+      (Parent)
+|------------------|    |                   |       |___________________| File X
+|                  |    |      File X       |  |--->|   File permission |
+|     ------------ |    |___________________|  |    |___________________|
+| FD0 |          | | -->|      .            |  |    |   File size       |
+|     ------------ | |  |      .            |  |    |___________________|
+| FD1 |          | | |  |  refcnt = 2       |  |    |   File Type       |
+|     ------------ | |  |  offset = 0       |__|    |___________________|
+| FD2 |          | | |  |(offset is shared) |       |      .            |
+|     ------------ | |  |___________________|       |      .            |
+| FD3 |          |-|--  |                   |       |      .            |
+|     ------------ | |  |                   |       |      .            |
+| FD4 |          | | |                              |      .            |
+|     ------------ | |                              |___________________| File Y
+|          |       | |                              |   File permission |
+|         \|/      | |                              |___________________|
+|------------------| |                              |   File size       |
+                     |                              |___________________|
+ P2 descriptor tbl   |                              |   File Type       |
+     (child)         |                              |                   |
+|------------------| |                              |___________________|
+|                  | |                              |      .            |
+|     ------------ | |                              |      .            |
+| FD0 |          | | |
+|     ------------ | |
+| FD1 |          | | |
+|     ------------ | |
+| FD2 |          | | |
+|     ------------ | |
+| FD3 |          |-|--
+|     ------------ |
+| FD4 |          | |
+|     ------------ |
+|          |       |
+|         \|/      |
+|------------------|
+
+[ ] rm -rf somefile.txt
+[ ] gcc test4.c
+[ ] ./a.out
+[ ] cat somefile.txt
+ONE TWO
+
+This is an interesting case, where an entry in 'Open file table' is shared
+between two related processes(parent and child). Hence, they have a common
+offset between both of them. Due to this when first 'fd' write something in the
+file, the 'offset' values increases, and then when the write happens with the
+second 'fd', the actual file write happens at the last updated offset value
+instead of starting from 0. That is the reason we see output of "ONE TWO".
