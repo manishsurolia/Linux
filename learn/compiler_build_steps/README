@@ -23,5 +23,6 @@ Note : I am using arch linux.
 11. [ ] export PATH=/opt/gcc13/bin:$PATH  #My default shell is BASH
 12. [ ] gcc --version
 13. [ ] echo 'export PATH=/opt/gcc13/bin:$PATH' >> ~/.bashrc
-14. [ ] reload
+14. [ ] reboot now
 15. [ ] gcc --version #Should be by default set to gcc13
+16. [ ] rm -rf compiler_build #Delete the directory where we built compiler
