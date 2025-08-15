@@ -1,0 +1,27 @@
+I needed GCC 13.3.0 to build linux kernel 6.10.5 as GCC15 was causing so many
+build failures.
+
+Below are the steps I followed to build GCC13.3.0,
+
+Note : I am using arch linux.
+
+1. [ ] mkdir compiler_build
+2. [ ] cd compiler_build
+3. [ ] wget https://ftp.gnu.org/gnu/gcc/gcc-13.3.0/gcc-13.3.0.tar.xz
+4. [ ] sudo pacman -S --needed gmp mpfr libmpc isl
+5. [ ] tar -xf gcc-13.3.0.tar.xz
+6. [ ] cd gcc-13.3.0
+7. [ ] mkdir build && cd build
+8. Build only c and c++ compilers.
+
+   [ ] ../configure --prefix=/opt/gcc13 \
+       --enable-languages=c,c++ \
+       --disable-multilib
+
+9.  [ ] make -j$(nproc)
+10. [ ] sudo make install
+11. [ ] export PATH=/opt/gcc13/bin:$PATH  #My default shell is BASH
+12. [ ] gcc --version
+13. [ ] echo 'export PATH=/opt/gcc13/bin:$PATH' >> ~/.bashrc
+14. [ ] reload
+15. [ ] gcc --version #Should be by default set to gcc13
